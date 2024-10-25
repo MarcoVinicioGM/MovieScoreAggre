@@ -19,7 +19,8 @@ async def get_movie_scores(title: str):
             return cache[title]["data"]
     
     try:
-        letterboxd_data = scrape_functions.scrape_film(title, ".json")
+        title = title.lower()
+        letterboxd_data = scrape_functions.scrape_film(title,'.json')
         # Get OMDB data (includes IMDb rating)
         omdb_key = os.getenv("OMDB_API_KEY")
         omdb_response = get(f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}")
@@ -29,13 +30,14 @@ async def get_movie_scores(title: str):
         # Convert IMDb rating to percentage
         imdb_score = (imdb_rating / 10) * 100
         
-        letterboxd_data = scrape_functions.scrape_film(f"https://letterboxd.com/film/{title}/", ".json")
-        letterboxd_score = letterboxd_data.get("Average_rating")  
+        letterboxd_score = letterboxd_data.get("Average_rating")
+        print(letterboxd_score)
 
         # Calculate aggregate score
         aggregate_score = {
             "title": omdb_data.get("Title"),
             "imdb_score": imdb_score,
+            "letterboxd_score": letterboxd_score,
             "aggregate_score": imdb_score,  # For now just IMDb, but you can add more
             "year": omdb_data.get("Year"),
             "poster": omdb_data.get("Poster")
