@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from requests import get
 import os
 from datetime import datetime, timedelta
+from scrapers.LetterBoxd.Letterboxdscraper.listscraper import scrape_functions
+
 
 app = FastAPI()
 
@@ -17,6 +19,7 @@ async def get_movie_scores(title: str):
             return cache[title]["data"]
     
     try:
+        letterboxd_data = scrape_functions.scrape_film(title, ".json")
         # Get OMDB data (includes IMDb rating)
         omdb_key = os.getenv("OMDB_API_KEY")
         omdb_response = get(f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}")
@@ -26,8 +29,9 @@ async def get_movie_scores(title: str):
         # Convert IMDb rating to percentage
         imdb_score = (imdb_rating / 10) * 100
         
-        # You could add more sources here
-        
+        letterboxd_data = scrape_functions.scrape_film(f"https://letterboxd.com/film/{title}/", ".json")
+        letterboxd_score = letterboxd_data.get("Average_rating")  
+
         # Calculate aggregate score
         aggregate_score = {
             "title": omdb_data.get("Title"),
@@ -47,3 +51,6 @@ async def get_movie_scores(title: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Marco's movie score aggregator!"}
