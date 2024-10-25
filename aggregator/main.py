@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from requests import get
 import os
+import httpx
 from datetime import datetime, timedelta
-from scrapers.LetterBoxd.Letterboxdscraper.listscraper import scrape_functions
+from scrapers.LetterBoxd.Letterboxdscraper.listscraper.scrape_functions import scrape_film
 
 
 app = FastAPI()
@@ -10,6 +11,36 @@ app = FastAPI()
 # Simple in-memory cache
 cache = {}
 CACHE_DURATION = timedelta(hours=24)
+
+
+async def check_imdb_api() -> bool:
+    try:
+        # Replace this URL with your actual IMDB API endpoint for a basic check
+        async with httpx.AsyncClient() as client:
+            omdb_key = os.getenv("OMDB_API_KEY")
+            response = await client.get(f"http://www.omdbapi.com/?i=tt3896198&apikey={omdb_key}")
+            return response.status_code == 200
+    except:
+        return False
+
+@app.get("/health")
+async def health_check() -> dict:
+    # Basic application health metrics
+    health_data = {
+        "status": "healthy",
+        "api_version": "1.0.0",
+        "dependencies": {
+            "imdb_api": await check_imdb_api(),
+            "letterboxd_scraping": True  # Since this is local scraping, we'll assume it's always available
+        }
+    }
+    
+    # If any critical dependency is down, return unhealthy status
+    if not all(health_data["dependencies"].values()):
+        health_data["status"] = "unhealthy"
+        raise HTTPException(status_code=503, detail=health_data)
+        
+    return health_data
 
 @app.get("/movie/{title}")
 async def get_movie_scores(title: str):
@@ -20,7 +51,7 @@ async def get_movie_scores(title: str):
     
     try:
         title = title.lower()
-        letterboxd_data = scrape_functions.scrape_film(title,'.json')
+        letterboxd_data = scrape_film(title,'.json')
         # Get OMDB data (includes IMDb rating)
         omdb_key = os.getenv("OMDB_API_KEY")
         omdb_response = get(f"http://www.omdbapi.com/?t={title}&apikey={omdb_key}")

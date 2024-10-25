@@ -1,0 +1,267 @@
+from bs4 import BeautifulSoup
+from tqdm import tqdm
+import requests
+import numpy as np
+import re
+import time
+
+_domain = 'https://letterboxd.com/'
+
+def scrape_film(film_title, output_file_extension, quiet=False, concat=False):
+    """
+    Scrapes all available information regarding a film. 
+    The function makes multiple request calls to relevant Letterboxd film URLs and gets their raw HTML code.
+    Using manual text extraction, the wanted information is found and stored in a dictionary.
+    
+    Parameters:
+        film_url (str):    The URL link of the film to be scraped.
+        output_file_extension (str):    Type of file extension, specifies 'not_found' entry.
+        quiet (bool):                   Option to turn-off tqdm.
+        concat (bool):                  Checks if concat is enabled.
+    Returns:
+        film_dict (dict):   A dictionary containing all the film's information.
+    """
+    film_title = film_title.replace(" ", "-").lower()
+    film_url = f"{_domain}film/{film_title}/"
+    
+    film_dict = {}
+    not_found = np.nan if output_file_extension == ".csv" else None
+
+    # Obtaining release year, director and average rating of the movie
+    try:
+        filmget = requests.get(film_url)
+        filmget.raise_for_status()  # Raise an exception for bad status codes
+    except requests.exceptions.RequestException as e:
+        if filmget.status_code == 404:
+            # Try to search for the film to get the correct URL
+            search_url = f"{_domain}search/films/{film_title}/"
+            try:
+                search_response = requests.get(search_url)
+                search_soup = BeautifulSoup(search_response.content, 'html.parser')
+                # Find the first film result
+                first_result = search_soup.find('div', class_='film-detail')
+                if first_result:
+                    film_url = _domain + first_result.find('a')['href'].lstrip('/')
+                    filmget = requests.get(film_url)
+                    filmget.raise_for_status()
+                else:
+                    print(f"Film not found: {film_title}")
+                    return None
+            except requests.exceptions.RequestException as e:
+                print(f"Error searching for film: {str(e)}")
+                return None
+    film_soup = BeautifulSoup(filmget.content, 'html.parser')
+
+    # Finding the film name
+    #film_dict["Film_title"] = film_soup.find("div", {"class" : "col-17"}).find("h1").text
+    film_dict["Film_title"] = film_title
+
+    # Try to find release year, if missing or 0 insert nan
+    release_year = int(str(film_soup.find_all("script")).split("releaseYear: ")[1].split(",")[0].strip("\""))
+    if release_year == 0:
+        release_year = not_found
+    film_dict["Release_year"] = release_year
+
+    # Try to find director, if missing insert nan
+    director = film_soup.find('meta', attrs={'name':'twitter:data1'}).attrs['content']
+    if director == "":
+        director = not_found
+    film_dict["Director"] = director
+
+    # Finding the cast, if not found insert a nan
+    try:
+        cast = [ line.contents[0] for line in film_soup.find('div', attrs={'id':'tab-cast'}).find_all('a')]
+
+        # remove all the 'Show All...' tags if they are present
+        film_dict["Cast"] = [i for i in cast if i != 'Show All…']
+    except:
+        film_dict["Cast"] = not_found
+
+    # Finding average rating, if not found insert a nan
+    try:
+        film_dict["Average_rating"] = float(film_soup.find('meta', attrs={'name':'twitter:data2'}).attrs['content'][:4])
+    except:
+        film_dict["Average_rating"] = not_found
+
+    # Try to find the list owner's rating of a film if possible and converting to float
+    try:
+        stringval = film_soup.find('div', {'class': 'rating-histogram'}).attrs['data-owner-rating']
+        if stringval != '0':
+            film_dict["Owner_rating"] = float(int(stringval)/2)
+        else:
+            film_dict["Owner_rating"] = not_found
+    except:
+        # Extra clause for type 'film' lists
+        try:
+            starval = film_soup.find_all("span")[-1].text
+            film_dict["Owner_rating"] = stars2val(starval, not_found)
+        except:
+            film_dict["Owner_rating"] = not_found
+        
+    # Finding film's genres, if not found insert nan
+    try: 
+        genres = film_soup.find('div', {'class': 'text-sluglist capitalize'})
+        film_dict["Genres"] = [genres.text for genres in genres.find_all('a', {'class': 'text-slug'})]
+    except:
+        film_dict["Genres"] = not_found
+
+    # Get movie runtime by searching for first sequence of digits in the p element with the runtime, if not found insert nan
+    try: 
+        film_dict["Runtime"] = int(re.search(r'\d+', film_soup.find('p', {'class': 'text-link text-footer'}).text).group())
+    except:
+        film_dict["Runtime"] = not_found
+
+    # Finding countries
+    try:
+        film_dict["Countries"] = [ line.contents[0] for line in film_soup.find('div', attrs={'id':'tab-details'}).find_all('a', href=re.compile(r'country'))]
+        if film_dict["Countries"] == []:
+            film_dict["Countries"] = not_found
+    except:
+        film_dict["Countries"] = not_found
+
+    # Finding spoken and original languages
+    try:
+        # Replace non-breaking spaces (\xa0) by a normal space 
+        languages = [ line.contents[0].replace('\xa0', ' ') for line in film_soup.find('div', attrs={'id':'tab-details'}).find_all('a', href=re.compile(r'language'))]
+        film_dict["Original_language"] = languages[0]                                      # original language (always first)
+        film_dict["Spoken_languages"] = list(sorted(set(languages), key=languages.index))   # all unique spoken languages
+    except:
+        film_dict["Original_language"] = not_found
+        film_dict["Spoken_languages"] = not_found
+
+    # Finding the description, if not found insert a nan
+    try:
+        film_dict['Description'] = film_soup.find('meta', attrs={'name' : 'description'}).attrs['content']
+    except:
+        film_dict['Description'] = not_found
+
+    # !! Currently not working with films that have a comma in their title
+    # # Finding alternative titles
+    # try:
+    #     alternative_titles = film_soup.find('div', attrs={'id':'tab-details'}).find('div', class_="text-indentedlist").text.strip().split(", ")
+    # except:
+    #     alternative_titles = not_found
+
+    # Finding studios
+    try:
+        film_dict["Studios"] = [ line.contents[0] for line in film_soup.find('div', attrs={'id':'tab-details'}).find_all('a', href=re.compile(r'studio'))]
+        if film_dict["Studios"] == []:
+            film_dict["Studios"] = not_found
+    except:
+        film_dict["Studios"] = not_found
+
+    # Getting number of watches, appearances in lists and number of likes (requires new link) ## 
+    movie = film_url.split('/')[-2]                                        # Movie title in URL
+    r = requests.get(f'https://letterboxd.com/csi/film/{film_title}/stats/')    # Stats page of said movie
+    stats_soup = BeautifulSoup(r.content, 'lxml')
+
+    # Get number of people that have watched the movie
+    watches = stats_soup.find('a', {'class': 'has-icon icon-watched icon-16 tooltip'})["title"]
+    watches = re.findall(r'\d+', watches)    # Find the number from string
+    film_dict["Watches"] = int(''.join(watches))          # Filter out commas from large numbers
+
+    # Get number of film appearances in lists
+    list_appearances = stats_soup.find('a', {'class': 'has-icon icon-list icon-16 tooltip'})["title"]
+    list_appearances = re.findall(r'\d+', list_appearances) 
+    film_dict["List_appearances"] = int(''.join(list_appearances))
+
+    # Get number of people that have liked the movie
+    likes = stats_soup.find('a', {'class': 'has-icon icon-like icon-liked icon-16 tooltip'})["title"]
+    likes = re.findall(r'\d+', likes)
+    film_dict["Likes"] = int(''.join(likes))
+
+    # Getting info on rating histogram (requires new link)
+    r = requests.get(f'https://letterboxd.com/csi/film/{movie}/rating-histogram/')    # Rating histogram page of said movie
+    hist_soup = BeautifulSoup(r.content, 'lxml')
+
+    # Get number of fans. Amount is given in 'K' notation, so if relevant rounded off to full thousands
+    try:
+        fans = hist_soup.find('a', {'class': 'all-link more-link'}).text
+        fans = re.findall(r'\d+.\d+K?|\d+K?', fans)[0]
+        if "." and "K" in fans:
+            fans = int(float(fans[:-1]) * 1000)
+        elif "K" in fans:
+            fans = int(fans[-1]) * 1000
+        else:
+            fans = int(fans)
+    except:
+        fans = 0
+    film_dict["Fans"] = fans
+
+    # Get rating histogram (i.e. how many star ratings were given) and total ratings (sum of rating histogram)
+    ratings = hist_soup.find_all("li", {'class': 'rating-histogram-bar'})
+    tot_ratings = 0
+    if len(ratings) != 0:
+        for i, r in enumerate(ratings):
+            string = r.text.strip(" ")
+            stars = val2stars((i+1)/2, not_found)
+            if string == "":
+                film_dict[f"{stars}"] = 0
+            else:
+                Nratings = re.findall(r'\d+', string)[:-1]
+                Nratings = int(''.join(Nratings))
+                film_dict[f"{stars}"] = Nratings
+                tot_ratings += Nratings
+
+    # If the film has not been released yet (i.e. no ratings)
+    else:
+        for i in range(10):
+            stars = val2stars((i+1)/2, not_found)
+            film_dict[f"{stars}"] = 0
+            
+    film_dict["Total_ratings"] = tot_ratings
+
+    # Thumbnail URL?
+
+    # Banner URL?
+    
+    # Save the film URL as an extra column
+    film_dict["Film_URL"] = film_url
+    
+    return film_dict
+
+# Some utility functions are stored here
+
+def stars2val(stars, not_found):
+    """
+    Transforms star rating into float value.
+    """
+    
+    conv_dict = {
+        "★": 1.0,
+        "★★": 2.0,
+        "★★★": 3.0,
+        "★★★★": 4.0,
+        "★★★★★": 5.0,
+        "½": 0.5,
+        "★½": 1.5,
+        "★★½": 2.5,
+        "★★★½": 3.5,
+        "★★★★½": 4.5 }
+
+    try:
+        val = conv_dict[stars]
+        return val
+    except:
+        return not_found
+    
+def val2stars(val, not_found):
+    """
+    Transforms float value into star string.
+    """
+    conv_dict = {
+        1.0 : "★",
+        2.0 : "★★",
+        3.0 : "★★★",
+        4.0 : "★★★★",
+        5.0 : "★★★★★",
+        0.5 : "½",
+        1.5 : "★½",
+        2.5 : "★★½",
+        3.5 : "★★★½",
+        4.5 : "★★★★½" }
+    try:
+        stars = conv_dict[val]
+        return stars
+    except:
+        return not_found
