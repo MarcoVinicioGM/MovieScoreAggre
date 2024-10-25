@@ -39,5 +39,5 @@ ENV SENTRY_DSN=${SENTRY_DSN}
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
+#Runs the app
 CMD ["uvicorn", "aggregator.main:app", "--host", "0.0.0.0", "--port", "8000"]
