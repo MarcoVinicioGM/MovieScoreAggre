@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from aggregator.main import app
+from main import app
 
 client = TestClient(app)
 

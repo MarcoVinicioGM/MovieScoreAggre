@@ -3,7 +3,7 @@ from requests import get
 import os
 import httpx
 from datetime import datetime, timedelta
-from scrapers.LetterBoxd.Letterboxdscraper.listscraper.scrape_functions import scrape_film
+from scrapers.LetterBoxd.scrape_functions import scrape_film
 
 
 app = FastAPI()
@@ -84,6 +84,7 @@ async def get_movie_scores(title: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/")
 async def root():
     return {"message": "Welcome to Marco's movie score aggregator!"}

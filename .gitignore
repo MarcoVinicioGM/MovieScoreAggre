@@ -1,6 +1,13 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 
+#Requirements from Letterboxd scraper
+Pip*
+*.ui
+.vscode
+scraper_outputs
+.DS_Store
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
