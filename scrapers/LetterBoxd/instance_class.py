@@ -1,5 +1,3 @@
-from listscraper.list_class import List
-import listscraper.checkimport_functions as cef
 import concurrent.futures # for pool of threads
 import time
 import sys
