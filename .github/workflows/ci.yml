@@ -33,8 +33,6 @@ jobs:
         OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
       run: |
         pytest tests/test_integration.py -v
-      if: ${{ secrets.OMDB_API_KEY != '' }}  # Only run if API key is available
-
     - name: Build Docker image
       run: docker build -t movie-aggregator .
     
