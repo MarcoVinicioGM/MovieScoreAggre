@@ -5,6 +5,24 @@ import httpx
 from datetime import datetime, timedelta
 from scrapers.LetterBoxd.scrape_functions import scrape_film
 
+from fastapi import FastAPI
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://802878ce0920728bc6636a4b77a0e9c7@o4508185427443712.ingest.us.sentry.io/4508185429540864",
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for tracing.
+    traces_sample_rate=1.0,
+    _experiments={
+        # Set continuous_profiling_auto_start to True
+        # to automatically start the profiler on when
+        # possible.
+        "continuous_profiling_auto_start": True,
+    },
+)
+
+app = FastAPI()
+
 app = FastAPI()
 # Simple in-memory cache
 cache = {}
@@ -106,3 +124,11 @@ async def get_movie_scores(title: str):
 @app.get("/")
 async def root():
     return {"message": "Welcome to Marco's movie score aggregator!"}
+
+@app.get("/sentry-debug")
+async def trigger_error():
+    division_by_zero = 1 / 0
+
+@app.get("/test-sentry")
+async def test_sentry():
+    raise Exception("Test Sentry Integration!")
