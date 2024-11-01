@@ -35,12 +35,16 @@ jobs:
         pip install -e .
     
     - name: Run unit tests
+      env:
+        OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        LETTERBOXD_USERNAME: ${{ secrets.LETTERBOXD_USERNAME }}
       run: |
         pytest tests/test_main.py -v --cov=aggregator --cov-report=xml
 
     - name: Run integration tests
       env:
         OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        LETTERBOXD_USERNAME: ${{ secrets.LETTERBOXD_USERNAME }}
       run: |
         pytest tests/test_integration.py -v
 
