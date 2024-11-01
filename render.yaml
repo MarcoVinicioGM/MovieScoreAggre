@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: movie-score-aggregator
+    env: python
+    buildCommand: |
+      apt-get update && \
+      apt-get install -y python3-dev && \
+      pip install --upgrade pip && \
+      pip install -r requirements.txt
+    startCommand: uvicorn aggregator.api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9
+      - key: OMDB_API_KEY
+        sync: false
