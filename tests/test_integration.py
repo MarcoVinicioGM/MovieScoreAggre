@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="bs4.build
 
 #Can only use non scored data as the rating is continually being updated
 #Seperated from other tests as it makes live calls to the API
-@pytest.mark.skipif(not os.getenv("OMDB_API_KEY"), reason="OMDB API key not found")
+
 def test_get_movie_scores_success():
     # Test successful movie lookup with real API
     response = client.get("/movie/The Godfather")
