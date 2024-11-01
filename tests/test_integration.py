@@ -3,7 +3,7 @@ import pytest
 import os
 import warnings
 from fastapi.testclient import TestClient
-from aggregator.main import app
+from aggregator.api import app
 
 
 

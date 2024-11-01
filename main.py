@@ -1,4 +1,4 @@
-from aggregator.main import app
+from aggregator.api import app
 import uvicorn
 import os
 

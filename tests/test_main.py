@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
-from aggregator.main import app
+from aggregator.api import app
 import os
 import logging
 
@@ -28,7 +28,7 @@ def test_read_root():
 
 #Obviously reads the health, however I had to make sure it mocks the API check otherwise it would not be
 #a real unit test as the network call could fail or the API could be down
-@patch('aggregator.main.check_imdb_api')
+@patch('aggregator.api.check_imdb_api')
 def test_health(mock_check_imdb):
     mock_check_imdb.return_value = True  # Mock the API check to return True
     response = client.get("/health")
@@ -38,7 +38,7 @@ def test_health(mock_check_imdb):
     assert data["dependencies"]["imdb_api"] == True
 
 #Tests a fake movie to make sure that the 404 is returned correctly
-@patch('aggregator.main.scrape_film')
+@patch('aggregator.api.scrape_film')
 @patch('requests.get')
 def test_movie_not_found(mock_requests, mock_scrape):
     # Mock OMDB API response for non-existent movie
@@ -53,7 +53,7 @@ def test_movie_not_found(mock_requests, mock_scrape):
     response = client.get("/movie/ThisMovieDoesNotExistAtAll123456789")
     assert response.status_code == 404
 
-@patch('aggregator.main.check_imdb_api')
+@patch('aggregator.api.check_imdb_api')
 def test_health_check_api_down(mock_check_imdb):
     mock_check_imdb.return_value = False
     response = client.get("/health")
