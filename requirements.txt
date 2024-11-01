@@ -63,3 +63,9 @@ uvicorn==0.32.0
 uvloop==0.21.0
 websocket-client==0.59.0
 websockets==13.1
+wheel
+twine
+requests
+pyperclip
+beautifulsoup4
+gunicorn==21.2.0

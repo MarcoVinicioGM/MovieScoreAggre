@@ -4,6 +4,8 @@ import os
 import httpx
 from datetime import datetime, timedelta
 from scrapers.LetterBoxd.scrape_functions import scrape_film
+from scrapers.RottenTomato.movie import Movie
+from scrapers.RottenTomato.exceptions import LookupError
 
 from fastapi import FastAPI
 import sentry_sdk
@@ -74,6 +76,26 @@ async def get_movie_scores(title: str):
         if letterboxd_data is None:
             raise MovieNotFoundException(f"Movie '{title}' not found on Letterboxd")
 
+        # Get Rotten Tomatoes data
+        try:
+            rt_movie = Movie(title)
+            rt_critic_score = rt_movie.tomatometer
+            rt_audience_score = rt_movie.audience_score
+            # Use weighted score if possible but if it can't just use critic.
+            if rt_critic_score and rt_audience_score:
+                rt_score = rt_movie.weighted_score
+            elif rt_critic_score:
+                rt_score = rt_critic_score
+            elif rt_audience_score:
+                rt_score = rt_audience_score
+            else:
+                rt_score = 0
+        except LookupError:
+            logger.warning(f"Movie '{title}' not found on Rotten Tomatoes")
+            rt_score = 0
+            rt_critic_score = 0
+            rt_audience_score = 0
+
         # Get OMDB data
         omdb_key = os.getenv("OMDB_API_KEY")
         if not omdb_key:
@@ -95,11 +117,20 @@ async def get_movie_scores(title: str):
 
         letterboxd_score = letterboxd_data.get("Average_rating")
         
+        # Calculate aggregate score (average of all available scores)
+        available_scores = [score for score in [imdb_score, letterboxd_score * 20, rt_score] if score != 0]
+        final_aggregate = sum(available_scores) / len(available_scores) if available_scores else 0
+        
         aggregate_score = {
             "title": omdb_data.get("Title"),
             "imdb_score": imdb_score,
-            "letterboxd_score": letterboxd_score,
-            "aggregate_score": imdb_score,
+            "letterboxd_score": letterboxd_score * 20,  # Convert to percentage
+            "rotten_tomatoes": {
+                "critic_score": rt_critic_score,
+                "audience_score": rt_audience_score,
+                "aggregate_score": rt_score
+            },
+            "aggregate_score": round(final_aggregate, 2),
             "year": omdb_data.get("Year"),
             "poster": omdb_data.get("Poster")
         }
@@ -113,14 +144,11 @@ async def get_movie_scores(title: str):
         return aggregate_score
         
     except MovieNotFoundException as e:
-        # Explicitly handle 404 cases
         raise HTTPException(status_code=404, detail=str(e))
     except HTTPException as e:
-        # Re-raise existing HTTP exceptions with their original status codes
         raise
     except Exception as e:
-        # Log the unexpected error for debugging
-        print(f"Unexpected error: {str(e)}")
+        logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @app.get("/")
