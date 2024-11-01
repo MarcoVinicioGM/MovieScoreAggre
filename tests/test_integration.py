@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="bs4.build
 @pytest.mark.skipif(not os.getenv("OMDB_API_KEY"), reason="OMDB API key not found")
 def test_get_movie_scores_success():
     # Test successful movie lookup with real API
-    response = client.get("/movie/The%20Godfather")
+    response = client.get("/movie/The Godfather")
     assert response.status_code == 200
     data = response.json()
     
