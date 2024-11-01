@@ -7,6 +7,7 @@ on:
       - 'v*'
   pull_request:
     branches: [ main ]
+    
 
 jobs:
   test:
@@ -34,25 +35,19 @@ jobs:
         pip install pytest pytest-asyncio pytest-cov
         pip install -e .
     
-    - name: Run unit tests
+    - name: Run unit tests with coverage
       env:
         OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
-        LETTERBOXD_USERNAME: ${{ secrets.LETTERBOXD_USERNAME }}
       run: |
-        pytest tests/test_main.py -v --cov=aggregator --cov-report=xml
+        pytest tests/test_main.py tests/test_integration.py -v --cov=aggregator --cov-report=xml:coverage.xml
 
-    - name: Run integration tests
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
       env:
-        OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
-        LETTERBOXD_USERNAME: ${{ secrets.LETTERBOXD_USERNAME }}
-      run: |
-        pytest tests/test_integration.py -v
-
-        - name: Upload results to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: MarcoVinicioGM/MovieScoreAggre
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        files: coverage.xml
+        fail_ci_if_error: true
 
   build:
     needs: test
