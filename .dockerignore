@@ -1,7 +1,47 @@
-__pycache__
-*.pyc
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+bin/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+venv/
 .env
+.venv/
+
+# Version control
 .git
 .gitignore
-.pytest_cache
-.venv
+.gitattributes
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+scraper_outputs/
+*.log
+*.ui
