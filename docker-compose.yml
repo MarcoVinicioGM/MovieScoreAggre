@@ -1,19 +1,11 @@
-version: '3.8'
-
+version: '3'
 services:
-  api:
+  web:
     build:
       context: .
-      dockerfile: Dockerfile
+      args:
+        - OMDB_API_KEY=${OMDB_API_KEY}
     ports:
       - "8000:8000"
     environment:
-      - ENVIRONMENT=development
       - OMDB_API_KEY=${OMDB_API_KEY}
-      - SENTRY_DSN=${SENTRY_DSN}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped

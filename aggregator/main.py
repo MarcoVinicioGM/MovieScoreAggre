@@ -7,6 +7,7 @@ from scrapers.LetterBoxd.scrape_functions import scrape_film
 
 from fastapi import FastAPI
 import sentry_sdk
+import logging
 
 sentry_sdk.init(
     dsn="https://802878ce0920728bc6636a4b77a0e9c7@o4508185427443712.ingest.us.sentry.io/4508185429540864",
@@ -22,11 +23,11 @@ sentry_sdk.init(
 )
 
 app = FastAPI()
-
-app = FastAPI()
 # Simple in-memory cache
 cache = {}
 CACHE_DURATION = timedelta(hours=24)
+
+logger = logging.getLogger(__name__)
 
 class MovieNotFoundException(Exception):
     """Custom exception for when a movie is not found"""
@@ -60,6 +61,7 @@ async def health_check() -> dict:
 
 @app.get("/movie/{title}")
 async def get_movie_scores(title: str):
+    logger.info(f"Received request for movie: {title}")
     try:
         # Check cache first
         if title in cache:

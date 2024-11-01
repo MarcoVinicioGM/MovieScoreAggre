@@ -1,46 +1,37 @@
-# Stage 1: Build and test
+# Builds the app with the dependencies
 FROM python:3.9.18-slim as builder
 
 WORKDIR /app
 
-# Copy requirements and install dependencies
+# Copy requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY aggregator/ aggregator/
-COPY scrapers/ scrapers/
-COPY tests/ tests/
-COPY setup.py .
+# Copy the entire project
+COPY . .
+
+# Install the package in development mode
+RUN pip install -e .
 
 # Install test dependencies
-RUN pip install pytest pytest-asyncio pytest-mock
+RUN pip install pytest pytest-asyncio pytest-mock pytest-cov
 
-# Set test environment
-ENV PYTHONPATH=/app
-ENV ENVIRONMENT=test
+# Run tests
+RUN python -m pytest tests/test_main.py -v
+RUN python -m pytest tests/test_integration.py -v
 
-# Run unit tests (no API key needed)
-RUN echo "Running unit tests without API calls..."
-RUN python -m pytest tests/test_unit.py -v || echo "Unit tests completed"
-
-# Build final image even if some tests fail
+# Final stage
 FROM python:3.9.18-slim
 
 WORKDIR /app
 
-# Copy application files
-COPY --from=builder /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3.9/site-packages/
-COPY aggregator/ aggregator/
-COPY scrapers/ scrapers/
-COPY setup.py .
+# Copy from builder stage
+COPY --from=builder /app .
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 
-# Create a non-root user
-RUN useradd -m appuser && chown -R appuser /app
-USER appuser
+# Set OMDB API key
+ARG OMDB_API_KEY
+ENV OMDB_API_KEY=${OMDB_API_KEY}
 
-# Expose port
-EXPOSE 8000
-
-# Command to run the application
-CMD ["uvicorn", "aggregator.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Learned that having main sepearated is better for docker
+CMD ["python", "run.py"]
